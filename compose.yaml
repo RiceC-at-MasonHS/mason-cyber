@@ -1,0 +1,22 @@
+services:
+  sam:
+    # mostly just followed the example from LSIO 
+    # https://docs.linuxserver.io/images/docker-kali-linux/#docker-compose-recommended-click-here-for-more-info
+    image: lscr.io/linuxserver/kali-linux:latest
+    container_name: ${SAM_USERNAME}-kali
+    ports:
+      - "${SAM_PORT}:3000" # Expose the port for the web interface
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/New_York
+      - SUBFOLDER=/ #optional
+      - "TITLE=Kali Linux" #optional
+      - CUSTOM_USER=${SAM_USERNAME}
+      - PASSWORD=${SAM_PASSWORD}
+    security_opt:
+      - seccomp:unconfined #optional
+    shm_size: "1gb" #optional
+    command: /usr/sbin/sshd -D
+    restart: unless-stopped
+ 
