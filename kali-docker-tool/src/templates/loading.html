@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Container Status</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
+    <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3"></script>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin-top: 50px;
+        }
+        #status {
+            font-size: 1.5em;
+            color: #333;
+        }
+        #terminal {
+            display: block; /* Ensure the terminal is visible */
+            width: 100%; /* Make the terminal take the full width of its container */
+            height: 400px; /* Set a default height */
+            max-height: 80vh; /* Limit the height to 80% of the viewport */
+            margin: 20px auto;
+            border: 1px solid #ccc;
+            overflow: hidden; /* Prevent scrollbars from appearing */
+            text-align: left; /* Ensure text is left-aligned */
+            user-select: text; /* Allow text selection */
+            -webkit-user-select: text; /* For Safari */
+            -moz-user-select: text; /* For Firefox */
+            -ms-user-select: text; /* For older IE */
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <h1>Kali Linux Terminal</h1>
+        <p id="status">{{ status }}</p>
+        <div id="terminal"></div>
+    </div>
+
+    <script>
+        const socket = io();
+        const terminal = new Terminal({
+            cursorBlink: true, // Enable cursor blinking
+            rows: 24, // Default number of rows
+            cols: 80, // Default number of columns
+            screenReaderMode: true, // Enable screen reader mode to allow text selection
+            theme: {
+                background: '#000000', // Black background
+                foreground: '#ffffff', // White text
+            }
+        });
+        const fitAddon = new FitAddon.FitAddon(); // Initialize the fit addon
+        terminal.loadAddon(fitAddon); // Load the fit addon
+
+        const app = Vue.createApp({
+            data() {
+                return {
+                    status: 'Initializing...'
+                };
+            },
+            mounted() {
+                // Open the terminal in the #terminal div
+                terminal.open(document.getElementById('terminal'));
+                fitAddon.fit(); // Resize the terminal to fit its container
+                terminal.focus(); // Focus the terminal to ensure the cursor is visible
+
+                // Write a welcome message and move the cursor to the top-left corner
+                terminal.write('\x1b[H'); // Move the cursor to the top-left corner
+                terminal.write('Welcome to the terminal!\r\n'); // Optional welcome message
+
+                // Adjust terminal size on window resize
+                window.addEventListener('resize', () => {
+                    fitAddon.fit();
+                });
+
+                // Handle terminal output from the backend
+                socket.on('terminal-output', (output) => {
+                    console.log('Received terminal output:', output); // Log the output
+                    terminal.write(output); // Write the output directly without replacing line endings
+                });
+
+                // Send terminal input to the backend
+                let inputBuffer = ""; // Initialize the input buffer
+
+                terminal.onData((input) => {
+                    if (input === "\r" || input === "\n") { // Check for Enter key (newline)
+                        terminal.write('\r\n'); // Move the cursor to the next line visually
+                        console.log("Sending full command to server:", inputBuffer); // Log the full command
+                        socket.emit("terminal-input", inputBuffer.trim() + "\n"); // Send the full command with \n only
+                        inputBuffer = ""; // Clear the buffer after sending
+                    } else if (input === "\u007F") { // Check for Backspace (ASCII 127)
+                        inputBuffer = inputBuffer.slice(0, -1); // Remove the last character from the buffer
+                        terminal.write("\b \b"); // Erase the character visually in the terminal
+                    } else {
+                        inputBuffer += input; // Append the input to the buffer
+                        terminal.write(input); // Display the input in the terminal
+                    }
+                });
+
+                // Check container status
+                this.checkStatus();
+            },
+            methods: {
+                async checkStatus() {
+                    try {
+                        const response = await fetch('/container-status');
+                        const data = await response.json();
+                        this.status = data.status;
+
+                        if (data.status === 'Container is ready') {
+                            console.log('Emitting start-terminal event'); // Add this log
+                            document.getElementById('terminal').style.display = 'block';
+                            socket.emit('start-terminal'); // Start the terminal session
+                        } else {
+                            setTimeout(this.checkStatus, 1000); // Poll every second
+                        }
+                    } catch (error) {
+                        this.status = 'Error fetching status.';
+                    }
+                }
+            }
+        });
+
+        app.mount('#app');
+    </script>
+</body>
+</html>

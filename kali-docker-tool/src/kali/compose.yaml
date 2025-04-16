@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  kali:
+    image: kalilinux/kali-rolling
+    container_name: kali_container
+    stdin_open: true
+    tty: true
+    ports:
+      - "2222:22" # Example: Expose SSH port
+    volumes:
+      - ./data:/root/data # Example: Mount a local directory to the container
+    command: /bin/bash # Start with a bash shell
