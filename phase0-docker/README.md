@@ -48,7 +48,6 @@
 ### 🛠️ Pre-installed Tools
 Each Kali environment includes:
 - `nmap` - Network scanning
-- `nikto` - Web vulnerability scanner
 - `hydra` - Password cracking
 - `metasploit` - Penetration testing framework
 - Custom aliases for easy learning
